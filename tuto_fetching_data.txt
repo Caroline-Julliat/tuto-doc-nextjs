@@ -1,0 +1,123 @@
+Fetching Data at Request Time
+---------------------------------
+
+If you need to fetch data at request time instead of at build time, you can try Server-side Rendering:
+To use Server-side Rendering, you need to export getServerSideProps instead of getStaticProps from your page.
+
+export async function getServerSideProps(context) {
+    return {
+      props: {
+        // props for your component
+      },
+    };
+  }
+
+Because getServerSideProps is called at request time, its parameter (context) contains request specific parameters.
+
+You should use getServerSideProps only if you need to pre-render a page whose data must be fetched at request time. Time to first byte (TTFB) will be slower than getStaticProps because the server must compute the result on every request, and the result cannot be cached by a CDN without extra configuration.
+
+-------
+
+Client-side Rendering
+---------------------------------
+
+If you do not need to pre-render the data, you can also use the following strategy (called Client-side Rendering):
+
+Statically generate (pre-render) parts of the page that do not require external data.
+When the page loads, fetch external data from the client using JavaScript and populate the remaining parts.
+
+This approach works well for user dashboard pages, for example. Because a dashboard is a private, user-specific page, SEO is not relevant, and the page doesn’t need to be pre-rendered. The data is frequently updated, which requires request-time data fetching.
+
+SWR
+---------------------------------
+
+The team behind Next.js has created a React hook for data fetching called SWR. We highly recommend it if you’re fetching data on the client side. It handles caching, revalidation, focus tracking, refetching on interval, and more. We won’t cover the details here, but here’s an example usage:
+
+import useSWR from 'swr';
+
+function Profile() {
+  const { data, error } = useSWR('/api/user', fetch);
+
+  if (error) return <div>failed to load</div>;
+  if (!data) return <div>loading...</div>;
+  return <div>hello {data.name}!</div>;
+}
+
+******************************************** //
+DYNAMIC ROUTES
+******************************************** //
+
+Fetch External API or Query Database
+---------------------------------------
+
+Like getStaticProps, getStaticPaths can fetch data from any data source. In our example, getAllPostIds (which is used by getStaticPaths) may fetch from an external API endpoint:
+
+export async function getAllPostIds() {
+    // Instead of the file system,
+    // fetch post data from an external API endpoint
+    const res = await fetch('..');
+    const posts = await res.json();
+    return posts.map((post) => {
+      return {
+        params: {
+          id: post.id,
+        },
+      };
+    });
+  }
+
+Development vs. Production
+---------------------------------------
+In development (npm run dev or yarn dev), getStaticPaths runs on every request.
+In production, getStaticPaths runs at build time.
+
+Fallback
+---------------------------------------
+Recall that we returned fallback: false from getStaticPaths. What does this mean?
+
+If fallback is false, then any paths not returned by getStaticPaths will result in a 404 page.
+
+If fallback is true, then the behavior of getStaticProps changes:
+
+The paths returned from getStaticPaths will be rendered to HTML at build time.
+The paths that have not been generated at build time will not result in a 404 page. Instead, Next.js will serve a “fallback” version of the page on the first request to such a path.
+In the background, Next.js will statically generate the requested path. Subsequent requests to the same path will serve the generated page, just like other pages pre-rendered at build time.
+If fallback is blocking, then new paths will be server-side rendered with getStaticProps, and cached for future requests so it only happens once per path.
+
+This is beyond the scope of our lessons, but you can learn more about fallback: true and fallback: 'blocking' in the fallback documentation.
+
+Catch-all Routes
+---------------------------------------
+Dynamic routes can be extended to catch all paths by adding three dots (...) inside the brackets. For example:
+
+pages/posts/[...id].js matches /posts/a, but also /posts/a/b, /posts/a/b/c and so on.
+If you do this, in getStaticPaths, you must return an array as the value of the id key like so:
+
+return [
+    {
+      params: {
+        // Statically Generates /posts/a/b/c
+        id: ['a', 'b', 'c'],
+      },
+    },
+    //...
+  ];
+
+And params.id will be an array in getStaticProps:
+
+export async function getStaticProps({ params }) {
+    // params.id will be like ['a', 'b', 'c']
+  }
+
+Router
+---------------------------------------
+If you want to access the Next.js router, you can do so by importing the useRouter hook from next/router.
+
+404 Pages
+---------------------------------------
+To create a custom 404 page, create pages/404.js. This file is statically generated at build time.
+
+// pages/404.js
+export default function Custom404() {
+    return <h1>404 - Page Not Found</h1>;
+  }
