@@ -1,3 +1,0 @@
-Deploying Your Next.js App
-
-- Push to GitHub
